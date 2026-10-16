@@ -29,29 +29,25 @@ getrennt konfiguriert.
 Bei öffentlichem Zugriff kann jeder Besucher kostenpflichtige Gemini-Anfragen
 auslösen. Cloud-Run-Instanzlimits setzen keine feste Grenze für Vertex-AI-Kosten.
 
-## Image in Cloud Shell bauen
+## Öffentliches Container-Image
 
-Das Docker-Repository in Artifact Registry muss bereits existieren. Der bauende
-Benutzer braucht dort Schreibrechte, etwa `roles/artifactregistry.writer`.
+Das Linux-AMD64-Image liegt öffentlich auf GitHub Container Registry:
 
-```bash
-git clone https://github.com/it-erben/cloud-run-gemini-demo.git
-cd cloud-run-gemini-demo
-
-export PROJECT_ID="DEINE-PROJEKT-ID"
-export REGION="europe-west1"
-export REPOSITORY="DEIN-ARTIFACT-REGISTRY-REPOSITORY"
-export IMAGE_TAG="v1"
-export IMAGE="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/gemini-web:${IMAGE_TAG}"
-
-gcloud auth configure-docker "${REGION}-docker.pkg.dev"
-docker build --platform linux/amd64 --tag "$IMAGE" .
-docker push "$IMAGE"
-printf '%s\n' "$IMAGE"
+```text
+ghcr.io/it-erben/cloud-run-gemini-demo:latest
 ```
 
-Der ausgegebene Image-Pfad dient als Container-Image für Cloud Run.
-Jeder neue Build bekommt einen neuen Tag, etwa `v2`.
+Der Image-Pfad kann direkt als Container-Image für Cloud Run verwendet werden.
+Ein GitHub-Login ist für den Download nicht erforderlich.
+
+```bash
+docker pull ghcr.io/it-erben/cloud-run-gemini-demo:latest
+```
+
+Jeder erfolgreich geprüfte Push auf `main` veröffentlicht `latest` und
+`sha-<vollständige-Commit-SHA>`. Der SHA-Tag oder ein Image-Digest legt den Stand
+für ein Deployment fest. Cloud Run übernimmt ein geändertes `latest` erst bei
+einem erneuten Deployment.
 
 ## Lokal ausführen
 
@@ -88,4 +84,4 @@ zusätzlich, ob der Container mit einem abweichenden `PORT` startet.
 - [Cloud Run Service Identity](https://docs.cloud.google.com/run/docs/securing/service-identity)
 - [Google Gen AI SDK](https://github.com/googleapis/python-genai)
 - [Gemini-Modelle und Laufzeiten](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/model-versions)
-- [Images nach Artifact Registry pushen](https://docs.cloud.google.com/artifact-registry/docs/docker/pushing-and-pulling)
+- [Container-Images auf Cloud Run deployen](https://docs.cloud.google.com/run/docs/deploying)
