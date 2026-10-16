@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block extra_head %}
+  {% if login_enabled %}<meta name="csrf-token" content="{{ csrf_token }}">{% endif %}
+{% endblock %}
+{% block content %}
+  {% if login_enabled %}
+  <p>Melde dich mit deinem Google-Konto an, um Gemini zu fragen und Ergebnisse zu speichern.</p>
+  <p class="metadata">Angemeldete Nutzer teilen sich die Dateien und BigQuery-Einträge.</p>
+  <div id="g_id_onload"
+       data-client_id="{{ google_oauth_client_id }}"
+       data-callback="handleGoogleCredential"
+       data-ux_mode="popup"
+       data-auto_prompt="false"
+       data-auto_select="false"
+       data-nonce="{{ login_nonce }}"></div>
+  <div class="g_id_signin" data-type="standard" data-text="signin_with" data-size="large"></div>
+  <p id="login-status" role="status"></p>
+  <script src="{{ url_for('static', filename='login.js') }}"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  {% else %}
+  <p class="error" role="alert">Die Anmeldung ist noch nicht eingerichtet.</p>
+  {% endif %}
+{% endblock %}

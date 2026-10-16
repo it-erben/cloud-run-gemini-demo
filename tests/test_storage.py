@@ -4,6 +4,7 @@ import unittest
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
+from auth_helpers import signed_in_client
 from google.api_core.exceptions import Forbidden
 from requests.exceptions import Timeout
 
@@ -13,7 +14,7 @@ import main
 class StorageTests(unittest.TestCase):
     def setUp(self):
         main.app.config.update(TESTING=True)
-        self.client = main.app.test_client()
+        self.client = signed_in_client()
         self.env = {
             "GOOGLE_CLOUD_PROJECT": "test-project",
             "BUCKET_NAME": "test-results",

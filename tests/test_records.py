@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from auth_helpers import signed_in_client
 from google.api_core.exceptions import Forbidden
 
 import main
@@ -12,7 +13,7 @@ import main
 class RecordViewsTests(unittest.TestCase):
     def setUp(self):
         main.app.config.update(TESTING=True)
-        self.client = main.app.test_client()
+        self.client = signed_in_client()
         self.env = {
             "GOOGLE_CLOUD_PROJECT": "test-project",
             "BUCKET_NAME": "test-results",

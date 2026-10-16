@@ -6,6 +6,42 @@ BigQuery und zeigen die vorhandenen Dateien beziehungsweise Tabellenzeilen an.
 Jede Anfrage startet ohne Chatverlauf. Die App nutzt Flask, Gunicorn und die
 Google-Clients für Gemini, Cloud Storage und BigQuery.
 
+Google Identity Services meldet Nutzer mit ihrem Google-Konto an. Gemini,
+Speichern und Listen sind erst nach der Anmeldung verfügbar.
+
+## Google-Anmeldung
+
+Der OAuth-Client in Google Auth Platform hat den Typ "Webanwendung". Unter
+"Autorisierte JavaScript-Quellen" steht die öffentliche HTTPS-Origin der App,
+etwa `https://gemini.erben.tech`, ohne Pfad. Für lokale Tests kann
+`http://localhost:8080` ergänzt werden. Im Testmodus müssen die Konten als
+Testnutzer zugelassen sein.
+
+Der Google-Button öffnet ein Popup. Der Browser sendet das ID-Token anschließend
+an `/auth/callback`. Der Server prüft Googles Signatur, Aussteller, Client-ID,
+Ablaufzeit und die Nonce der Anmeldesitzung. Die App nutzt weder ein
+OAuth-Client-Secret noch eine OAuth-Redirect-URI. Google-Zugriffstokens und
+Refresh-Tokens werden nicht angefordert oder gespeichert.
+
+`GOOGLE_OAUTH_CLIENT_ID` enthält die Client-ID mit der Endung
+`.apps.googleusercontent.com`. `SESSION_SECRET` signiert die App-Sitzung und
+enthält mindestens 32 zufällige Zeichen, zum Beispiel aus `openssl rand -hex 32`.
+Der Wert bleibt über Neustarts, Revisionen und Instanzen hinweg gleich.
+Eine Änderung meldet bestehende Sitzungen ab. Secrets gehören außerhalb von Git.
+
+Die Sitzung gilt eine Stunde. Ihr Cookie ist `Secure`, `HttpOnly` und
+`SameSite=Lax`; die öffentliche App benötigt HTTPS. Schreibende Requests und
+die Anmeldung prüfen zusätzlich ein CSRF-Token. "Abmelden" entfernt das lokale
+Sitzungscookie. Bereits kopierte Sitzungscookies bleiben bis zum Ablauf gültig.
+Fehlt eine der beiden Variablen oder ist das Sitzungsgeheimnis zu kurz, bleibt
+die Anwendung gesperrt. `/healthz` bleibt als Startprüfung erreichbar.
+
+Jedes zugelassene Google-Konto kann die App verwenden. Eine eigene Freigabeliste
+oder Aufteilung der Daten nach Nutzer besteht nicht. Alle angemeldeten Nutzer
+sehen dieselben GCS-Dateien und BigQuery-Zeilen. Der Load Balancer bleibt
+öffentlich; IAP wird nicht benötigt. Die App-Anmeldung ersetzt keine IAM-Rollen
+des Cloud-Run-Service-Accounts.
+
 ## Laufzeit
 
 Der Container lauscht auf `0.0.0.0:$PORT`, standardmäßig Port `8080`.
@@ -13,15 +49,17 @@ Der Cloud-Storage-Tab liegt unter `/`, der BigQuery-Tab unter `/bigquery`.
 Beide Formulare fordern mit POST an denselben Pfad eine Gemini-Antwort an.
 Prompts sind auf 2000 Zeichen begrenzt, Antworten auf 1024 Ausgabetokens.
 
-| Umgebungsvariable       | Bedeutung                              | Standardwert            |
-| ----------------------- | -------------------------------------- | ----------------------- |
-| `GOOGLE_CLOUD_PROJECT`  | Projekt-ID für Vertex AI, erforderlich | keiner                  |
-| `GOOGLE_CLOUD_LOCATION` | Standort des Gemini-Endpunkts          | `global`                |
-| `GEMINI_MODEL`          | Gemini-Modell                          | `gemini-3.1-flash-lite` |
-| `BUCKET_NAME`           | Name des vorhandenen Ergebnis-Buckets  | keiner                  |
-| `BQ_DATASET`            | ID des vorhandenen BigQuery-Datasets   | keiner                  |
-| `BQ_TABLE`              | ID der vorhandenen BigQuery-Tabelle    | keiner                  |
-| `PORT`                  | HTTP-Port des Containers               | `8080`                  |
+| Umgebungsvariable        | Bedeutung                                | Standardwert            |
+| ------------------------ | ---------------------------------------- | ----------------------- |
+| `GOOGLE_CLOUD_PROJECT`   | Projekt-ID für Vertex AI, erforderlich   | keiner                  |
+| `GOOGLE_CLOUD_LOCATION`  | Standort des Gemini-Endpunkts            | `global`                |
+| `GEMINI_MODEL`           | Gemini-Modell                            | `gemini-3.1-flash-lite` |
+| `GOOGLE_OAUTH_CLIENT_ID` | OAuth-Client-ID für die Google-Anmeldung | keiner                  |
+| `SESSION_SECRET`         | Dauerhaftes Geheimnis für App-Sitzungen  | keiner                  |
+| `BUCKET_NAME`            | Name des vorhandenen Ergebnis-Buckets    | keiner                  |
+| `BQ_DATASET`             | ID des vorhandenen BigQuery-Datasets     | keiner                  |
+| `BQ_TABLE`               | ID der vorhandenen BigQuery-Tabelle      | keiner                  |
+| `PORT`                   | HTTP-Port des Containers                 | `8080`                  |
 
 Im Zielprojekt muss `aiplatform.googleapis.com` aktiviert sein. Der an Cloud Run
 gebundene Service Account braucht `roles/aiplatform.user` auf diesem Projekt.
@@ -32,10 +70,9 @@ Cloud-Run-Laufzeit. API-Key und Service-Account-Schlüsseldatei entfallen.
 in einer bestimmten Region. Der Cloud-Run-Standort und der Gemini-Endpunkt werden
 getrennt konfiguriert.
 
-Bei öffentlichem Zugriff kann jeder Besucher kostenpflichtige Gemini-Anfragen
-auslösen. Konfigurierte Speicherziele erlauben außerdem das Speichern und
-Anzeigen von Daten über die öffentliche App. Die BigQuery-Liste führt Abfragen
-aus. Cloud-Run-Instanzlimits begrenzen diese API-, Abfrage- und Speicherkosten
+Angemeldete Nutzer können kostenpflichtige Gemini-Anfragen auslösen. Konfigurierte
+Speicherziele erlauben außerdem das Speichern und Anzeigen von Daten. Die
+BigQuery-Liste führt Abfragen aus. Cloud-Run-Instanzlimits begrenzen diese API-, Abfrage- und Speicherkosten
 nicht auf einen festen Betrag. Für die Demo eignen sich separate Buckets und
 Tabellen mit Übungsdaten.
 
@@ -134,6 +171,8 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 export GOOGLE_CLOUD_PROJECT="DEINE-PROJEKT-ID"
+export GOOGLE_OAUTH_CLIENT_ID="DEINE-CLIENT-ID.apps.googleusercontent.com"
+export SESSION_SECRET="$(openssl rand -hex 32)"
 gunicorn --bind 0.0.0.0:8080 --timeout 90 main:app
 ```
 
@@ -152,14 +191,18 @@ python -m unittest discover -s tests -v
 docker build --tag gemini-demo:local .
 ```
 
-Die Tests prüfen Eingaben, HTML-Ausgabe, Fehlerfälle, beide Speicherziele und
-das Blättern durch Listen. SDK-Tests prüfen die erzeugten Vertex-AI-, Storage-
+Die Tests prüfen Anmeldung, Sitzungen, CSRF, Eingaben, HTML-Ausgabe, Fehlerfälle,
+beide Speicherziele und das Blättern durch Listen. Signierte Test-Tokens prüfen
+die echte Google-Tokenvalidierung einschließlich Signatur, Zielgruppe, Aussteller
+und Ablauf. SDK-Tests prüfen die erzeugten Vertex-AI-, Storage-
 und BigQuery-Anfragen. Cloud-Zugriffe werden simuliert; die Tests
 benötigen keine Cloud-Zugangsdaten. GitHub Actions prüft zusätzlich, ob der
 Container mit einem abweichenden `PORT` startet.
 
 ## Quellen
 
+- [Google-Anmeldebutton](https://developers.google.com/identity/gsi/web/guides/display-button)
+- [Google-ID-Token auf dem Server prüfen](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token)
 - [Cloud Run Service Identity](https://docs.cloud.google.com/run/docs/securing/service-identity)
 - [Google Gen AI SDK](https://github.com/googleapis/python-genai)
 - [Gemini-Modelle und Laufzeiten](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/model-versions)

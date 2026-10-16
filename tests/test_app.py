@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import httpx
+from auth_helpers import signed_in_client
 from google import genai
 from google.genai import errors, types
 from google.oauth2.credentials import Credentials
@@ -15,7 +16,7 @@ import main
 class WebTests(unittest.TestCase):
     def setUp(self):
         main.app.config.update(TESTING=True)
-        self.client = main.app.test_client()
+        self.client = signed_in_client()
 
     def test_form_loads_without_cloud_credentials(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -129,7 +130,7 @@ class SDKTests(unittest.TestCase):
             patch("main.genai.Client", return_value=sdk_client),
             patch("google.cloud.storage.Client"),
         ):
-            response = main.app.test_client().post(
+            response = signed_in_client().post(
                 "/", data={"prompt": "Was ist Terraform?"}
             )
         self.assertEqual(response.status_code, 200)

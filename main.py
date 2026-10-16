@@ -17,9 +17,11 @@ from cloud_records import (
     list_objects,
     save_bigquery_row,
 )
+from google_login import init_auth
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 128 * 1024
+init_auth(app)
 
 
 CLOUD_ERRORS = (

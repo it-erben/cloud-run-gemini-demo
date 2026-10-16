@@ -11,8 +11,9 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --uid 10001 --create-home app
 
-COPY main.py cloud_records.py ./
+COPY main.py cloud_records.py google_login.py ./
 COPY templates/ templates/
+COPY static/ static/
 USER 10001:10001
 EXPOSE 8080
 CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 4 --timeout 90 main:app"]

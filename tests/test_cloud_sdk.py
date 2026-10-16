@@ -5,11 +5,10 @@ from unittest.mock import patch
 from urllib.parse import urlsplit
 
 import requests
+from auth_helpers import signed_in_client
 from google.auth.credentials import AnonymousCredentials
 from google.auth.transport.requests import AuthorizedSession
 from google.cloud import bigquery, storage
-
-import main
 
 
 class FakeSession(AuthorizedSession):
@@ -77,7 +76,7 @@ class CloudSDKTests(unittest.TestCase):
             ),
             patch("google.cloud.bigquery.Client", return_value=sdk),
         ):
-            response = main.app.test_client().post(
+            response = signed_in_client().post(
                 "/bigquery/save",
                 data={"prompt": "Saved question", "answer": "Saved answer"},
             )
@@ -121,7 +120,7 @@ class CloudSDKTests(unittest.TestCase):
             ),
             patch("google.cloud.storage.Client", return_value=sdk),
         ):
-            response = main.app.test_client().get("/")
+            response = signed_in_client().get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"file-49.txt", response.data)
         self.assertIn(b"/?page_token=page-two", response.data)
