@@ -76,13 +76,11 @@ class StorageTests(unittest.TestCase):
             with (
                 self.subTest(data_length=sum(map(len, data.values()))),
                 patch.dict(os.environ, self.env, clear=True),
-                patch(
-                    "google.cloud.storage.Client",
-                    side_effect=AssertionError("Unexpected storage call"),
-                ),
+                patch("google.cloud.storage.Client") as factory,
             ):
                 response = self.client.post("/save", data=data)
-            self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.status_code, 400)
+                factory.return_value.__enter__.return_value.bucket.return_value.blob.return_value.upload_from_string.assert_not_called()
 
     def test_upload_error_keeps_answer_and_hides_server_details(self):
         storage_client = MagicMock()

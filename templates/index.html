@@ -17,19 +17,38 @@
       button { margin-top: .8rem; padding: .7rem 1.2rem; border: 0;
                border-radius: .5rem; background: #2455cf; color: white; font: inherit;
                cursor: pointer; }
-      button:focus-visible, textarea:focus-visible { outline: 3px solid #799fff;
+      a:focus-visible, button:focus-visible, textarea:focus-visible { outline: 3px solid #799fff;
                                                    outline-offset: 3px; }
       pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
       .error { color: #9f2222; }
       .saved { padding: .8rem; background: #e7f4e9; border-radius: .5rem; }
       code { overflow-wrap: anywhere; }
+      a { color: #2455cf; }
+      .tabs { display: flex; gap: .5rem; border-bottom: 1px solid #dde2ed;
+              margin: 1.5rem 0; padding-bottom: .5rem; }
+      .tabs a { padding: .6rem 1rem; border-radius: .5rem; text-decoration: none; }
+      .tabs a[aria-current="page"] { color: white; background: #2455cf; }
+      .records { border-top: 1px solid #dde2ed; margin-top: 2rem; padding-top: 1rem; }
+      .record { border: 1px solid #dde2ed; border-radius: .5rem; padding: 1rem;
+                margin: 1rem 0; overflow-wrap: anywhere; }
+      .record pre { margin-bottom: 0; }
+      .metadata { font-size: .9rem; color: #4d5970; }
+      .object-list { padding-left: 1.25rem; }
+      .object-list li { margin: 1rem 0; overflow-wrap: anywhere; }
+      .pagination { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+      @media (max-width: 480px) { main { padding: 1rem; } body { padding: 1rem .5rem; } }
     </style>
   </head>
   <body>
     <main>
       <h1>Frag Gemini</h1>
       <p>Stell eine Frage. Jede Anfrage beginnt ohne bisherigen Chatverlauf.</p>
-      <form method="post" action="/">
+      <nav class="tabs" aria-label="Speicherziel">
+        <a href="/" {% if backend == 'gcs' %}aria-current="page"{% endif %}>Cloud Storage</a>
+        <a href="/bigquery" {% if backend == 'bigquery' %}aria-current="page"{% endif %}>BigQuery</a>
+      </nav>
+      <p>Speicherziel: <strong>{{ 'BigQuery' if backend == 'bigquery' else 'Cloud Storage' }}</strong></p>
+      <form method="post" action="{{ url_for('index', backend=backend) }}">
         <label for="prompt">Deine Frage</label>
         <textarea id="prompt" name="prompt" maxlength="2000" required>{{ prompt }}</textarea>
         <button type="submit">Antwort anfordern</button>
@@ -42,7 +61,7 @@
         {% if saved_uri %}
         <p class="saved" role="status">Gespeichert als <code>{{ saved_uri }}</code></p>
         {% elif storage_enabled %}
-        <form method="post" action="/save">
+        <form method="post" action="{{ url_for('save_result', backend=backend) }}">
           <input type="hidden" name="prompt" value="{{ prompt }}">
           <input type="hidden" name="answer" value="{{ answer }}">
           <button type="submit">Ergebnis speichern</button>
@@ -50,6 +69,53 @@
         {% endif %}
       </section>
       {% endif %}
+      <section class="records" aria-labelledby="records-title">
+        <h2 id="records-title">{{ 'Einträge in BigQuery' if backend == 'bigquery' else 'Dateien in Cloud Storage' }}</h2>
+        {% if not storage_enabled %}
+          {% if backend == 'bigquery' %}
+          <p>BigQuery ist noch nicht eingerichtet. GOOGLE_CLOUD_PROJECT, BQ_DATASET und BQ_TABLE müssen gesetzt sein.</p>
+          {% else %}
+          <p>Cloud Storage ist noch nicht eingerichtet. BUCKET_NAME muss gesetzt sein.</p>
+          {% endif %}
+        {% else %}
+        <p><code>{{ destination }}</code></p>
+        <a href="{{ url_for('index', backend=backend) }}">Aktualisieren</a>
+        {% if listing_error %}
+        <p class="error" role="alert">{{ listing_error }}</p>
+        {% elif items %}
+          {% if backend == 'bigquery' %}
+          {% for item in items %}
+          <article class="record">
+            <p class="metadata">{{ item.created_at or 'Kein Zeitpunkt' }}</p>
+            <strong>Frage</strong>
+            <pre>{{ item.prompt }}</pre>
+            <details>
+              <summary>Antwort anzeigen</summary>
+              <pre>{{ item.answer }}</pre>
+            </details>
+          </article>
+          {% endfor %}
+          {% else %}
+          <ul class="object-list">
+            {% for item in items %}
+            <li><code>{{ item.name }}</code><br>
+              <span class="metadata">{{ item.size }} Bytes · {{ item.updated or 'Kein Zeitpunkt' }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+        {% else %}
+        <p>{{ 'Noch keine Einträge auf dieser Seite.' if backend == 'bigquery' else 'Noch keine Dateien auf dieser Seite.' }}</p>
+        {% endif %}
+        {% if not listing_error %}
+        <nav class="pagination" aria-label="Listenseiten">
+          {% if previous_url %}<a href="{{ previous_url }}">Zurück</a>{% endif %}
+          {% if backend == 'bigquery' %}<span>Seite {{ page + 1 }}</span>{% endif %}
+          {% if next_url %}<a href="{{ next_url }}">Weitere Einträge</a>{% endif %}
+        </nav>
+        {% endif %}
+        {% endif %}
+      </section>
     </main>
   </body>
 </html>

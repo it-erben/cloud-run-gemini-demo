@@ -11,7 +11,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     && useradd --uid 10001 --create-home app
 
-COPY main.py .
+COPY main.py cloud_records.py ./
 COPY templates/ templates/
 USER 10001:10001
 EXPOSE 8080

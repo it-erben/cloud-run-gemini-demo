@@ -127,6 +127,7 @@ class SDKTests(unittest.TestCase):
                 },
             ),
             patch("main.genai.Client", return_value=sdk_client),
+            patch("google.cloud.storage.Client"),
         ):
             response = main.app.test_client().post(
                 "/", data={"prompt": "Was ist Terraform?"}
