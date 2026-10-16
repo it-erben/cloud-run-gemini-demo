@@ -22,6 +22,7 @@ class WebTests(unittest.TestCase):
             response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'name="prompt"', response.data)
+        self.assertNotIn(b"Ergebnis speichern", response.data)
 
     def test_empty_prompt_is_rejected(self):
         response = self.client.post("/", data={"prompt": "   "})
@@ -74,7 +75,7 @@ class WebTests(unittest.TestCase):
         self.assertIn(b"keine Textantwort", response.data)
 
     def test_large_request_is_rejected(self):
-        response = self.client.post("/", data={"prompt": "x" * 20000})
+        response = self.client.post("/", data={"prompt": "x" * 200000})
         self.assertEqual(response.status_code, 413)
 
 
@@ -118,7 +119,13 @@ class SDKTests(unittest.TestCase):
             ),
         )
         with (
-            patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT": "test-project"}),
+            patch.dict(
+                os.environ,
+                {
+                    "GOOGLE_CLOUD_PROJECT": "test-project",
+                    "BUCKET_NAME": "test-results",
+                },
+            ),
             patch("main.genai.Client", return_value=sdk_client),
         ):
             response = main.app.test_client().post(
@@ -126,6 +133,7 @@ class SDKTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Terraform beschreibt Infrastruktur.", response.data)
+        self.assertIn(b"Ergebnis speichern", response.data)
         self.assertEqual(len(captured), 1)
         request = captured[0]
         self.assertEqual(request.url.host, "aiplatform.googleapis.com")

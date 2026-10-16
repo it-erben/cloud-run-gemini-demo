@@ -1,8 +1,9 @@
 # Cloud Run Gemini Demo
 
 Python-Web-App mit Eingabefeld für einen Prompt und Textantwort von Gemini über
-Vertex AI. Jede Anfrage startet ohne Chatverlauf. Die App nutzt Flask, Gunicorn
-und das Google Gen AI SDK.
+Vertex AI. Antworten lassen sich über einen Button in Cloud Storage speichern.
+Jede Anfrage startet ohne Chatverlauf. Die App nutzt Flask, Gunicorn und die
+Google-Clients für Gemini und Cloud Storage.
 
 ## Laufzeit
 
@@ -15,6 +16,7 @@ Pfad. Prompts sind auf 2000 Zeichen begrenzt, Antworten auf 1024 Ausgabetokens.
 | `GOOGLE_CLOUD_PROJECT`  | Projekt-ID für Vertex AI, erforderlich | keiner                  |
 | `GOOGLE_CLOUD_LOCATION` | Standort des Gemini-Endpunkts          | `global`                |
 | `GEMINI_MODEL`          | Gemini-Modell                          | `gemini-3.1-flash-lite` |
+| `BUCKET_NAME`           | Name des vorhandenen Ergebnis-Buckets  | keiner                  |
 | `PORT`                  | HTTP-Port des Containers               | `8080`                  |
 
 Im Zielprojekt muss `aiplatform.googleapis.com` aktiviert sein. Der an Cloud Run
@@ -27,7 +29,29 @@ in einer bestimmten Region. Der Cloud-Run-Standort und der Gemini-Endpunkt werde
 getrennt konfiguriert.
 
 Bei öffentlichem Zugriff kann jeder Besucher kostenpflichtige Gemini-Anfragen
-auslösen. Cloud-Run-Instanzlimits setzen keine feste Grenze für Vertex-AI-Kosten.
+auslösen und bei aktivierter Speicherfunktion Objekte im Bucket erzeugen.
+Cloud-Run-Instanzlimits setzen keine feste Grenze für diese API- und Speicherkosten.
+
+## Ergebnisse speichern
+
+`BUCKET_NAME` aktiviert die Speicherfunktion. Der Wert ist der Name eines bereits
+vorhandenen privaten Buckets, etwa `mein-projekt-gemini-results`, ohne `gs://`.
+Im Projekt muss `storage.googleapis.com` aktiviert sein. Der Laufzeit-Service-Account
+von Cloud Run braucht `roles/storage.objectCreator` auf diesem Bucket.
+
+Nach einer Antwort erscheint der Button "Ergebnis speichern". Er schreibt eine
+neue JSON-Datei mit Prompt, Antwort und UTC-Zeitpunkt nach
+`answers/YYYY-MM-DD/<zufällige-ID>.json`. Die Anwendung zeigt danach den
+`gs://`-Pfad an. Beim Speichern wird Gemini nicht erneut aufgerufen.
+
+Jeder Speichervorgang erzeugt ein eigenes Objekt. Bestehende Objekte werden durch
+eine Erstellungsbedingung vor Überschreiben geschützt. Die App liest oder löscht
+keine gespeicherten Objekte; die Dateien bleiben über die Bucket-Berechtigungen
+zugänglich. Bei einem Uploadfehler bleibt die Antwort im Formular erhalten.
+
+Das Speicherformular sendet Prompt und Antwort aus dem Browser erneut an den
+Server. Der Endpunkt prüft deren Länge und speichert sie als JSON. Die Inhalte
+können durch einen geänderten Browserrequest angepasst werden.
 
 ## Öffentliches Container-Image
 
@@ -74,10 +98,10 @@ python -m unittest discover -s tests -v
 docker build --tag gemini-demo:local .
 ```
 
-Die Tests prüfen Eingaben, HTML-Ausgabe, Fehlerfälle und die vom SDK erzeugte
-Vertex-AI-Anfrage mit einem simulierten HTTP-Endpunkt. Sie benötigen keine
-Cloud-Zugangsdaten und senden keine echten Gemini-Anfragen. GitHub Actions prüft
-zusätzlich, ob der Container mit einem abweichenden `PORT` startet.
+Die Tests prüfen Eingaben, HTML-Ausgabe, Fehlerfälle, den Storage-Upload und die
+vom SDK erzeugte Vertex-AI-Anfrage. Cloud-Zugriffe werden simuliert; die Tests
+benötigen keine Cloud-Zugangsdaten. GitHub Actions prüft zusätzlich, ob der
+Container mit einem abweichenden `PORT` startet.
 
 ## Quellen
 
@@ -85,3 +109,5 @@ zusätzlich, ob der Container mit einem abweichenden `PORT` startet.
 - [Google Gen AI SDK](https://github.com/googleapis/python-genai)
 - [Gemini-Modelle und Laufzeiten](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/model-versions)
 - [Container-Images auf Cloud Run deployen](https://docs.cloud.google.com/run/docs/deploying)
+- [Cloud-Storage-Objekte aus dem Speicher hochladen](https://docs.cloud.google.com/storage/docs/uploading-objects-from-memory)
+- [IAM-Rollen für Cloud Storage](https://docs.cloud.google.com/storage/docs/access-control/iam-roles)

@@ -21,6 +21,8 @@
                                                    outline-offset: 3px; }
       pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
       .error { color: #9f2222; }
+      .saved { padding: .8rem; background: #e7f4e9; border-radius: .5rem; }
+      code { overflow-wrap: anywhere; }
     </style>
   </head>
   <body>
@@ -37,6 +39,15 @@
       <section aria-labelledby="answer-title">
         <h2 id="answer-title">Antwort</h2>
         <pre>{{ answer }}</pre>
+        {% if saved_uri %}
+        <p class="saved" role="status">Gespeichert als <code>{{ saved_uri }}</code></p>
+        {% elif storage_enabled %}
+        <form method="post" action="/save">
+          <input type="hidden" name="prompt" value="{{ prompt }}">
+          <input type="hidden" name="answer" value="{{ answer }}">
+          <button type="submit">Ergebnis speichern</button>
+        </form>
+        {% endif %}
       </section>
       {% endif %}
     </main>
