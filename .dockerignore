@@ -1,0 +1,10 @@
+.git
+.github
+.venv
+.ruff_cache
+__pycache__
+*.pyc
+tests
+README.md
+.env*
+*.tf*

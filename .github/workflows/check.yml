@@ -1,0 +1,28 @@
+name: Check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: python -m unittest discover -s tests -v
+      - run: docker build --tag gemini-demo:check .
+      - name: Check container startup
+        run: |
+          docker run --detach --name gemini-demo --publish 9090:9090 --env PORT=9090 gemini-demo:check
+          trap 'docker logs gemini-demo; docker rm --force gemini-demo' EXIT
+          curl --fail --retry 10 --retry-connrefused --retry-delay 1 http://localhost:9090/
